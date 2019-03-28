@@ -1,6 +1,5 @@
 {
     "name": "s25/curl",
-    "version": "1.0.0",
     "description": "Yet another CURL wrapper",
     "type": "library",
     "license": "MIT",

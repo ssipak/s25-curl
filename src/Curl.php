@@ -255,21 +255,20 @@ namespace S25\Curl {
 
     /**
      * @param $url
-     * @param null $params
+     * @param null|mixed $query
      * @return Response
      *
      * @throws Exception
      */
-    public function get($url, $params = null): Response
+    public function get($url, $query = null): Response
     {
-      $url = $params ? self::appendQueryToUrl($url, $params) : $url;
-      return $this->req($url);
+      return $this->req(self::appendQueryToUrl($url, $query));
     }
 
     /**
      * Выполянет POST запрос, передевая параметры в кодировке application/x-www-form-urlencoded
      * @param $url
-     * @param null $params
+     * @param null|mixed $params
      * @return Response
      *
      * @throws Exception
@@ -285,7 +284,7 @@ namespace S25\Curl {
     /**
      * Выполянет POST запрос, передевая параметры в кодировке multipart/form-data, если параметры получены в массиве
      * @param $url
-     * @param null $params
+     * @param null|mixed $params
      * @return Response
      *
      * @throws Exception
@@ -447,18 +446,22 @@ namespace S25\Curl {
       return $opts;
     }
 
-
-
-    protected static function appendQueryToUrl(string $url, $params): string
+    protected static function appendQueryToUrl(string $url, $query): string
     {
-      $params = is_string($params) ? $params : http_build_query($params);
+      $query = $query ?? '';
+      $query = is_string($query) ? $query : http_build_query($query);
+
+      if ($query === '')
+      {
+        return $url;
+      }
 
       return preg_replace_callback(
         '/(?<query>\?[^#]*)?(?<hash>#.*)?$/u',
-        function($match) use ($params) {
-          $query = $match['query'] ?? '';
-          $hash = $match['hash'] ?? '';
-          return $query . ($query ? '&' : '?') . $params . $hash;
+        function($match) use ($query) {
+          $oldQuery = $match['query'] ?? '';
+          $oldHash = $match['hash'] ?? '';
+          return $oldQuery . ($oldQuery ? '&' : '?') . $query . $oldHash;
         },
         $url
       );
