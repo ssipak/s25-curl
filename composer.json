@@ -10,7 +10,8 @@
         }
     ],
     "require": {
-        "php": "^7.0"
+        "php": "^7.0",
+        "ext-curl": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "^6"
@@ -19,6 +20,7 @@
         "psr-4": {"S25\\Curl\\": "src/"}
     },
     "scripts": {
-        "test": "./vendor/bin/phpunit --bootstrap vendor/autoload.php test/CurlTest.php"
+        "test":  "./vendor/bin/phpunit --bootstrap vendor/autoload.php test/CurlTest.php",
+        "debug": "./vendor/bin/phpunit --bootstrap vendor/autoload.php test/CurlTest.php --debug"
     }
 }

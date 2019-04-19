@@ -1,7 +1,7 @@
 <?php
 
-namespace S25\Curl {
-
+namespace S25\Curl
+{
   class Curl
   {
     /**
@@ -13,6 +13,8 @@ namespace S25\Curl {
     const AUTOREFERER_HOST  = 'host'; // Подстановка CURLOPT_REFERER только при запросе на тот же хост
 
     const JSONFIELDS = 'json_fields'; // Конвертирует значение в JSON и помещает в CURLOPT_POSTFIELDS
+
+    const RESOLVE_RELATIVE_URL = 'resolve_relative_url';
 
     protected $curl = null;
     protected $commonOpts = [];
@@ -109,6 +111,7 @@ namespace S25\Curl {
       $resultOpts[CURLOPT_VERBOSE] = isset($resultOpts[CURLOPT_VERBOSE]) && $resultOpts[CURLOPT_VERBOSE] > 0;
 
       $resultOpts = $this->detectReferrer($resultOpts);
+      $resultOpts = $this->resolveRelativeUrl($resultOpts);
 
       // По-умолчанию считаем, что:
       // CURLOPT_RETURNTRANSFER === true, т.к. иначе ответ будет выведен в стандартный поток вывода
@@ -370,6 +373,39 @@ namespace S25\Curl {
       return $opts;
     }
 
+    protected function resolveRelativeUrl(array $opts): array
+    {
+      $flag = boolval($opts[self::RESOLVE_RELATIVE_URL] ?? true);
+      unset($opts[self::RESOLVE_RELATIVE_URL]);
+
+      if ($flag === false)
+      {
+        return $opts;
+      }
+
+      $url = $opts[CURLOPT_URL] ?? null;
+      if ($url === null)
+      {
+        return $opts;
+      }
+
+      $parsedUrl = parse_url($url);
+      if (isset($parsedUrl['host']) || isset($parsedUrl['schema']))
+      {
+        return $opts;
+      }
+
+      $lastUrl = $this->getLastUrl();
+      if ($lastUrl === null)
+      {
+        return $opts;
+      }
+
+      $opts[CURLOPT_URL] = self::buildUrl(self::mergeParsedUrls(parse_url($lastUrl), $parsedUrl));
+
+      return $opts;
+    }
+
     /**
      * Преобразует список строк с HTTP-заголовками в ассоциативный массив ['Нормализованное-Имя-Заголовка' => 'значение']
      * @param array $headers
@@ -465,6 +501,65 @@ namespace S25\Curl {
         },
         $url
       );
+    }
+
+    protected static function mergeParsedUrls(array $baseParsedUrl, array $relParsedUrl): array
+    {
+      // http://absolute.url
+      // /relative/to/root/dir
+      // relative/to/current/dir
+      // ./relative/to/current/dir
+      // ../relative/to/parent/of/current/dir
+      // ?no-path=only-query
+      // any/../not//canonical/../../path/dir/file.ext
+
+      $relPath = $relParsedUrl['path'] ?? null;
+      $basePath = $baseParsedUrl['path'] ?? null;
+
+      $path = null;
+
+      if (is_string($relPath))
+      {
+        $path = preg_match('~^/~u', $relPath) === 0 && is_string($basePath)
+          ?  preg_replace('~[^/]+$~u', '', $basePath)
+          : '';
+        $path .= $relPath;
+      }
+      else
+      {
+        $path = $basePath;
+      }
+
+      $path = preg_replace('~/+~u', '/', $path);         // Remove duplicate slashes
+      $path = preg_replace('~(?<=^|/)\./~u', '', $path); // Remove current directory node
+      do
+      {
+        $path = preg_replace('~[^/]+/\.\./~', '', $path, -1, $count); // Remove parent directory node
+      }
+      while ($count > 0);
+
+      return array_filter([
+        'scheme'    => $baseParsedUrl['scheme'] ?? null,
+        'host'      => $baseParsedUrl['host'] ?? null,
+        'port'      => $baseParsedUrl['port'] ?? null,
+        'path'      => $path,
+        'query'     => $relParsedUrl['query'] ?? null,
+        'fragment'  => $relParsedUrl['fragment'] ?? null,
+      ], function($part) { return $part !== null; });
+    }
+
+    protected static function buildUrl(array $parsedUrl)
+    {
+      $scheme   = isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] . '://' : '';
+      $host     = isset($parsedUrl['host'])   ? $parsedUrl['host'] : '';
+      $port     = isset($parsedUrl['port'])   ? ':' . $parsedUrl['port'] : '';
+      $user     = isset($parsedUrl['user'])   ? $parsedUrl['user'] : '';
+      $pass     = isset($parsedUrl['pass'])   ? ':' . $parsedUrl['pass']  : '';
+      $pass     = ($user || $pass) ? "$pass@" : '';
+      $path     = isset($parsedUrl['path'])   ? $parsedUrl['path'] : '';
+      $query    = isset($parsedUrl['query'])  ? '?' . $parsedUrl['query'] : '';
+      $fragment = isset($parsedUrl['fragment']) ? '#' . $parsedUrl['fragment'] : '';
+      return "$scheme$user$pass$host$port$path$query$fragment";
     }
   }
 }
