@@ -14,7 +14,7 @@ namespace S25\Curl
 
     const JSONFIELDS = 'json_fields'; // Конвертирует значение в JSON и помещает в CURLOPT_POSTFIELDS
 
-    const RESOLVE_RELATIVE_URL = 'resolve_relative_url';
+    const BASE_URL = 'base_url';
 
     protected $curl = null;
     protected $commonOpts = [];
@@ -111,7 +111,7 @@ namespace S25\Curl
       $resultOpts[CURLOPT_VERBOSE] = isset($resultOpts[CURLOPT_VERBOSE]) && $resultOpts[CURLOPT_VERBOSE] > 0;
 
       $resultOpts = $this->detectReferrer($resultOpts);
-      $resultOpts = $this->resolveRelativeUrl($resultOpts);
+      $resultOpts = $this->resolveUrl($resultOpts);
 
       // По-умолчанию считаем, что:
       // CURLOPT_RETURNTRANSFER === true, т.к. иначе ответ будет выведен в стандартный поток вывода
@@ -373,12 +373,12 @@ namespace S25\Curl
       return $opts;
     }
 
-    protected function resolveRelativeUrl(array $opts): array
+    protected function resolveUrl(array $opts): array
     {
-      $flag = boolval($opts[self::RESOLVE_RELATIVE_URL] ?? true);
-      unset($opts[self::RESOLVE_RELATIVE_URL]);
+      $baseUrl = $opts[self::BASE_URL] ?? null;
+      unset($opts[self::BASE_URL]);
 
-      if ($flag === false)
+      if (!$baseUrl)
       {
         return $opts;
       }
@@ -395,13 +395,17 @@ namespace S25\Curl
         return $opts;
       }
 
-      $lastUrl = $this->getLastUrl();
-      if ($lastUrl === null)
+      if ($baseUrl === true)
+      {
+        $baseUrl = $this->getLastUrl();
+      }
+
+      if ($baseUrl === null)
       {
         return $opts;
       }
 
-      $opts[CURLOPT_URL] = self::buildUrl(self::mergeParsedUrls(parse_url($lastUrl), $parsedUrl));
+      $opts[CURLOPT_URL] = self::buildUrl(self::mergeParsedUrls(parse_url($baseUrl), $parsedUrl));
 
       return $opts;
     }

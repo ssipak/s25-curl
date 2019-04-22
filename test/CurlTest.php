@@ -65,10 +65,11 @@ final class CurlTest extends TestCase
     }
   }
 
-  public function testResolvingOfRelativeUrl()
+  public function testResolvingUrl()
   {
     $baseUrl = 'http://example.com/some/dir/file.ext';
     $tests = [
+      'http://absolute.url'       => 'http://absolute.url',
       '/relative/to/root/dir'     => 'http://example.com/relative/to/root/dir',
       'relative/to/current/dir'   => 'http://example.com/some/dir/relative/to/current/dir',
       './relative/to/current/dir' => 'http://example.com/some/dir/relative/to/current/dir',
@@ -77,30 +78,11 @@ final class CurlTest extends TestCase
       'any/../not//canonical/../../path/dir/file.gif' => 'http://example.com/some/dir/path/dir/file.gif',
     ];
 
+    $curl = new Curl([Curl::BASE_URL => $baseUrl]);
+
     foreach ($tests as $url => $expected)
     {
-      $this->assertEquals($expected, $this->resolveRelativeUrl($baseUrl, $url));
+      $this->assertEquals($expected, $curl->reqOpts($url)[CURLOPT_URL]);
     }
-  }
-
-  private function resolveRelativeUrl(string $baseUrl, string $testUrl)
-  {
-    $parsedUrl = $this->invokeStaticMethod(Curl::class, 'mergeParsedUrls', [parse_url($baseUrl), parse_url($testUrl)]);
-    return $this->invokeStaticMethod(Curl::class, 'buildUrl', [$parsedUrl]);
-  }
-
-  /**
-   * Invokes private/protected static method of class
-   * @param string $class
-   * @param string $methodName
-   * @param array $parameters
-   * @return mixed
-   * @throws ReflectionException
-   */
-  public function invokeStaticMethod(string $class, string $methodName, array $parameters = [])
-  {
-    $method = new ReflectionMethod($class, $methodName);
-    $method->setAccessible(true);
-    return $method->invokeArgs(null, $parameters);
   }
 }
