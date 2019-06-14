@@ -63,6 +63,22 @@ namespace S25\Curl
 
         #region Helpers
 
+        public function getHeadersAssoc()
+        {
+            if (is_array($this->headers) === false || empty($this->headers)) {
+                return $this->headers;
+            }
+
+            $assocHeaders = [];
+            foreach ($this->headers as $header)
+            {
+                list($key, $value) = explode(': ', $header, 2) + [null, null];
+
+                $assocHeaders[$key] = $value;
+            }
+
+            return $assocHeaders;
+        }
 
         /**
          * @param bool $assoc

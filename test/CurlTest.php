@@ -79,4 +79,16 @@ final class CurlTest extends TestCase
             $this->assertEquals($expected, $curl->reqOpts($url)[CURLOPT_URL]);
         }
     }
+    public function testHeaderAssoc()
+    {
+        $curl = new Curl();
+        $headersAssoc = $curl->get('example.com')->getHeadersAssoc();
+
+        $expected = [
+            'Content-Type' => "text/html; charset=UTF-8",
+            'Vary' => "Accept-Encoding",
+        ];
+
+        $this->assertEquals($expected, array_intersect_key($headersAssoc, $expected));
+    }
 }
