@@ -1,9 +1,10 @@
 <?php
 
-namespace S25\Curl {
+namespace S25\Curl
+{
 
-  class Exception extends \Exception
-  {
-  }
+    class Exception extends \Exception
+    {
+    }
 }
 
