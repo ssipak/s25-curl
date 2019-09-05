@@ -91,4 +91,16 @@ final class CurlTest extends TestCase
 
         $this->assertEquals($expected, array_intersect_key($headersAssoc, $expected));
     }
+
+    public function testPostVerbosity()
+    {
+        $memoryHandler = fopen('php://memory', 'w+b');
+
+        $curl = new Curl([CURLOPT_VERBOSE => 2, CURLOPT_STDERR => $memoryHandler]);
+        $curl->post('example.com', ['crap' => 'qwerty']);
+
+        rewind($memoryHandler);
+        $data = stream_get_contents($memoryHandler);
+        $this->assertNotEquals($data, '');
+    }
 }

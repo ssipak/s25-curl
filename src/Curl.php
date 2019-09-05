@@ -17,10 +17,10 @@ namespace S25\Curl
 
         const BASE_URL = 'base_url';
 
-        protected $curl       = null;
+        protected $curl;
         protected $commonOpts = [];
 
-        protected $lastUrl = null;
+        protected $lastUrl;
 
         /**
          * Curl constructor.
@@ -55,28 +55,29 @@ namespace S25\Curl
                 curl_reset($this->curl);
             }
 
-            $resultOpts = $this->reqOpts($url, $opts);
+            $resultOpts = $this->reqOpts($url, $opts, $verbose);
 
             curl_setopt_array($this->curl, $resultOpts);
 
             $response = curl_exec($this->curl);
 
-            if ($resultOpts[CURLOPT_VERBOSE] > 1) {
-                echo $response . "\n";
+            if ($verbose > 1) {
+                $stdErr = $resultOpts[CURLOPT_STDERR] ?? STDERR;
+                $postFields = $resultOpts[CURLOPT_POSTFIELDS] ?? null;
+                if ($postFields) {
+                    fwrite($stdErr, "> POSTFIELDS\n{$postFields}\n");
+                }
+                fwrite($stdErr, "< RESPONSE\n{$response}\n");
             }
 
             if ($response === false) {
                 $response = Response::fromError($url, curl_error($this->curl));
+            } else if (isset($resultOpts[CURLOPT_RETURNTRANSFER]) === false || !$resultOpts[CURLOPT_RETURNTRANSFER]) {
+                $response = Response::fromUrl($url);
+            } else if ($resultOpts[CURLOPT_HEADER] ?? null) {
+                $response = Response::fromResponse($url, $response);
             } else {
-                if (isset($resultOpts[CURLOPT_RETURNTRANSFER]) === false || !$resultOpts[CURLOPT_RETURNTRANSFER]) {
-                    $response = Response::fromUrl($url);
-                } else {
-                    if ($resultOpts[CURLOPT_HEADER] ?? null) {
-                        $response = Response::fromResponse($url, $response);
-                    } else {
-                        $response = Response::fromBody($url, $response);
-                    }
-                }
+                $response = Response::fromBody($url, $response);
             }
 
             return $response;
@@ -86,11 +87,12 @@ namespace S25\Curl
          * Вычисляет результирующие параметры curl, объединяя текущие ($opts) и общие ($common)
          * @param string|null $url
          * @param array $opts
+         * @param $verbose
          * @return array
          *
          * @throws Exception
          */
-        public function reqOpts(string $url = null, array $opts = []): array
+        public function reqOpts(string $url = null, array $opts = [], &$verbose = 0): array
         {
             $opts = self::transpileOpts(self::parseHeadersInOpts($opts));
 
@@ -102,7 +104,8 @@ namespace S25\Curl
             // предвычесленные заголовки, текущие опции, наименьший приоритет у общих опций.
             $resultOpts = ($url ? [CURLOPT_URL => $url] : []) + $headersOpt + $opts + $this->commonOpts;
             // Вывод отладочных данных
-            $resultOpts[CURLOPT_VERBOSE] = isset($resultOpts[CURLOPT_VERBOSE]) && $resultOpts[CURLOPT_VERBOSE] > 0;
+            $verbose = $resultOpts[CURLOPT_VERBOSE] ?? 0;
+            $resultOpts[CURLOPT_VERBOSE] = $verbose > 0;
 
             $resultOpts = $this->detectReferrer($resultOpts);
             $resultOpts = $this->resolveUrl($resultOpts);
@@ -507,7 +510,7 @@ namespace S25\Curl
                 'path' => $path,
                 'query' => $relParsedUrl['query'] ?? null,
                 'fragment' => $relParsedUrl['fragment'] ?? null,
-            ], function ($part) {
+            ], static function ($part) {
                 return $part !== null;
             });
         }
@@ -515,12 +518,12 @@ namespace S25\Curl
         protected static function buildUrl(array $parsedUrl)
         {
             $scheme = isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] . '://' : '';
-            $host = isset($parsedUrl['host']) ? $parsedUrl['host'] : '';
+            $host = $parsedUrl['host'] ?? '';
             $port = isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '';
-            $user = isset($parsedUrl['user']) ? $parsedUrl['user'] : '';
+            $user = $parsedUrl['user'] ?? '';
             $pass = isset($parsedUrl['pass']) ? ':' . $parsedUrl['pass'] : '';
             $pass = ($user || $pass) ? "$pass@" : '';
-            $path = isset($parsedUrl['path']) ? $parsedUrl['path'] : '';
+            $path = $parsedUrl['path'] ?? '';
             $query = isset($parsedUrl['query']) ? '?' . $parsedUrl['query'] : '';
             $fragment = isset($parsedUrl['fragment']) ? '#' . $parsedUrl['fragment'] : '';
             return "$scheme$user$pass$host$port$path$query$fragment";
